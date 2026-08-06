@@ -43,7 +43,8 @@ Then copy `cut.mp4` into `public/` and generate the data files below.
   },
   "hook": {                          // static headline, first ~4s (always on)
     "enabled": true, "endSec": 4.0,
-    "style": "card",                 // "card" (default) | "outline"
+    "style": "card",                 // "card" (default) | "outline" | "realce" | "misto"
+    "font": "poppins",               // "poppins" (default) | "anton" | "playfair" | "baskerville" | "montserrat" | "caveat" — headline typeface only
     "lines": ["A IA MAIS", "PERIGOSA DO MUNDO", "ACABOU DE SER LIBERADA"],
     "logo": "brand/logo.webp",       // card only: public/ path or null
     "sign": "brand/warning.webp"     // card only: transparent symbol or null

@@ -10,7 +10,11 @@
 <!-- Poppins italic 900 + Playfair italic 900 are NOT decoration here: the caption
      previews render the real template styles, and the stacked style is built out
      of exactly these faces (see STACK_MIXED in StackedCaptions.tsx). -->
-<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,600;0,700;0,800;0,900;1,900&family=Playfair+Display:ital,wght@1,900&family=Lora:ital,wght@0,400;0,600;1,400;1,600&family=Libre+Baskerville:wght@700&family=Inter:wght@500&display=swap" rel="stylesheet">
+<!-- Anton, Montserrat and Caveat added for the Estilo tab's headline font
+     picker (STYLE_CATALOG.fonts / HEADLINE_FONTS in Main.tsx) — Playfair
+     Display and Libre Baskerville gained their upright 700/900 + 400 weights
+     for the same reason (the stacked-caption load only needed italic/700). -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,600;0,700;0,800;0,900;1,900&family=Playfair+Display:ital,wght@0,700;0,900;1,900&family=Lora:ital,wght@0,400;0,600;1,400;1,600&family=Libre+Baskerville:wght@400;700&family=Inter:wght@500&family=Anton&family=Montserrat:wght@700;900&family=Caveat:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
@@ -72,6 +76,11 @@
       <div class="setup-group">
         <div class="group-head"><span class="group-title">Estilo de headline</span></div>
         <div id="optHeadline" class="opt-grid"></div>
+      </div>
+
+      <div class="setup-group">
+        <div class="group-head"><span class="group-title">Fonte da headline</span></div>
+        <div id="optFont" class="opt-grid"></div>
       </div>
 
       <div class="setup-group">

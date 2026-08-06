@@ -137,6 +137,18 @@ const STYLE_CATALOG = {
     {id: 'realce', name: 'Realce', hl: 'realce'},
     {id: 'misto', name: 'Misto', hl: 'misto'},
   ],
+  // Font applies to the headline only. Ids mirror HEADLINE_FONTS in the
+  // template's Main.tsx — keep the two in step. Each preview renders in
+  // whichever headline STYLE is currently picked, so the card shows the real
+  // combination, not the font in isolation.
+  fonts: [
+    {id: 'poppins', name: 'Poppins', font: 'poppins'},
+    {id: 'anton', name: 'Anton', font: 'anton'},
+    {id: 'playfair', name: 'Playfair', font: 'playfair'},
+    {id: 'baskerville', name: 'Baskerville', font: 'baskerville'},
+    {id: 'montserrat', name: 'Montserrat', font: 'montserrat'},
+    {id: 'caveat', name: 'Caveat', font: 'caveat'},
+  ],
   captions: [
     {id: 'karaoke', name: 'Karaokê', demo: 'karaoke'},
     {id: 'stacked', name: 'Empilhado', demo: 'stacked'},
@@ -326,6 +338,17 @@ const HL_STYLES = {
   realce: { weights: [900, 900], cap: 86, safeW: 830, lh: 1.04 },
   misto: { weights: [400, 900], cap: 98, safeW: 900, lh: 0.98 },
 };
+// CSS stacks for HEADLINE_FONTS (Main.tsx) — the Google Fonts <link> in
+// index.html must load the weights these previews and the outline/card
+// styles actually use.
+const FONT_STACKS = {
+  poppins: "'Poppins', sans-serif",
+  anton: "'Anton', sans-serif",
+  playfair: "'Playfair Display', serif",
+  baskerville: "'Libre Baskerville', serif",
+  montserrat: "'Montserrat', sans-serif",
+  caveat: "'Caveat', cursive",
+};
 
 // Measured in RENDER units (1080-wide), scaled to the box only at the end — the
 // template's letterSpacing is -1px at 1080, which is NOT proportional once the
@@ -346,12 +369,13 @@ function measureType(text, size, weight, family, tracking) {
   hlMeter.textContent = text;
   return hlMeter.offsetWidth;
 }
-const hlWidth = (text, size, weight) => measureType(text, size, weight);
+const hlWidth = (text, size, weight, family) => measureType(text, size, weight, family);
 
 // Balance by MEASURED width, not word count: "É assim que vai" and "ficar a sua
 // headline" are 4 and 3 words but nearly the same width — counting words breaks
-// the line in the wrong place.
-function hlTwoLines(text, weights) {
+// the line in the wrong place. Measured in the CHOSEN font — the break point
+// shifts with the typeface.
+function hlTwoLines(text, weights, family) {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length < 2) return [words[0] || '', ''];
   let best = [words[0], words.slice(1).join(' ')];
@@ -359,29 +383,31 @@ function hlTwoLines(text, weights) {
   for (let i = 1; i < words.length; i++) {
     const a = words.slice(0, i).join(' ');
     const b = words.slice(i).join(' ');
-    const d = Math.abs(hlWidth(a, 100, weights[0]) - hlWidth(b, 100, weights[1]));
+    const d = Math.abs(hlWidth(a, 100, weights[0], family) - hlWidth(b, 100, weights[1], family));
     if (d < bestDiff) { bestDiff = d; best = [a, b]; }
   }
   return best;
 }
 
-function hlFit(lines, S) {
+function hlFit(lines, S, family) {
   const widest = (size) =>
-    Math.max(hlWidth(lines[0], size, S.weights[0]), hlWidth(lines[1], size, S.weights[1]));
+    Math.max(hlWidth(lines[0], size, S.weights[0], family), hlWidth(lines[1], size, S.weights[1], family));
   let size = Math.floor((S.safeW / Math.max(1, widest(100))) * 100);
   size = Math.floor((S.safeW / Math.max(1, widest(size))) * size);
   return Math.max(HL_MIN, Math.min(size, S.cap));
 }
 
-function buildHeadlineDemo(host, styleId) {
+function buildHeadlineDemo(host, styleId, fontId) {
   const s = host.clientWidth / 1080;
   const S = HL_STYLES[styleId];
+  const family = FONT_STACKS[fontId] || FONT_STACKS.poppins;
   host.innerHTML = '';
   const wrap = el('div', 'cap-demo', host);
   const raw = styleId === 'card' ? HEADLINE_TEXT.toUpperCase() : HEADLINE_TEXT;
-  const lines = hlTwoLines(raw, S.weights);
-  const size = hlFit(lines, S) * s;
+  const lines = hlTwoLines(raw, S.weights, family);
+  const size = hlFit(lines, S, family) * s;
   const box = el('div', `hl-demo hl-${styleId}`, wrap);
+  box.style.fontFamily = family;
   box.style.lineHeight = String(S.lh);
   box.style.letterSpacing = `${-1 * s}px`;
 
@@ -591,6 +617,7 @@ function defaultStyle() {
   return {
     edit: STYLE_CATALOG.edits[0].id,
     headline: STYLE_CATALOG.headlines[0].id,
+    font: STYLE_CATALOG.fonts[0].id,
     captions: STYLE_CATALOG.captions[0].id,
     accent: ACCENT_DEFAULT,
     elements,
@@ -1130,7 +1157,7 @@ function updateSummary() {
   const on = STYLE_CATALOG.elements.filter((e) => S.style.elements[e.id]);
   const accentBit = accentUsed() ? ` · destaque ${accentName(S.style.accent)}` : '';
   $('setupSummary').textContent =
-    `${styleName('edits', S.style.edit)} · headline ${styleName('headlines', S.style.headline)}` +
+    `${styleName('edits', S.style.edit)} · headline ${styleName('headlines', S.style.headline)} (${styleName('fonts', S.style.font)})` +
     ` · legenda ${styleName('captions', S.style.captions)}${accentBit} · ` +
     (on.length ? on.map((e) => e.name).join(', ') : 'sem elementos extras');
 }
@@ -1173,18 +1200,19 @@ function renderSetup() {
       card.dataset.id = o.id;
       // headline previews are two short lines — they do not need the caption
       // box's height, and with four groups on one screen that height is scarce
-      const kind = o.mock ? 'frame' : o.hl ? 'cap hlbox' : 'cap';
+      const kind = o.mock ? 'frame' : (o.hl || o.font) ? 'cap hlbox' : 'cap';
       const prev = el('div', `opt-preview ${kind}`, card);
       if (o.demo) capAnims.push(CAP_BUILDERS[o.demo](prev));
-      else if (o.hl) buildHeadlineDemo(prev, o.hl);
+      else if (o.hl) buildHeadlineDemo(prev, o.hl, S.style.font);
+      else if (o.font) buildHeadlineDemo(prev, S.style.headline, o.font);
       else if (o.stat) {
         const step = buildStaticDemo(prev, o.stat);
         if (step) capAnims.push(step);
       }
       else prev.innerHTML = o.mock || '';
-      // Only the abstract mockups get a title. A card that renders the real
-      // caption or the real headline is already labelled — by itself.
-      if (o.mock) el('div', 'opt-name', card).textContent = o.name;
+      // Only the abstract mockups get a title, plus font cards — unlike a
+      // headline STYLE, a font is not always recognizable from the sample alone.
+      if (o.mock || o.font) el('div', 'opt-name', card).textContent = o.name;
       el('div', 'opt-mark', card);
     }
     // the ghost only earns its space where there is a single option to explain
@@ -1196,6 +1224,7 @@ function renderSetup() {
 
   radios($('optEdit'), 'edits', S.style.edit);
   radios($('optHeadline'), 'headlines', S.style.headline);
+  radios($('optFont'), 'fonts', S.style.font);
   radios($('optCaptions'), 'captions', S.style.captions);
   renderAccents();
 
@@ -1219,7 +1248,7 @@ $('styleSetup').addEventListener('click', (e) => {
   if (e.target.closest('#optAccent')) return;
   const opt = e.target.closest('.opt:not(.ghost)');
   if (opt) {
-    const key = {edits: 'edit', headlines: 'headline', captions: 'captions'}[opt.dataset.group];
+    const key = {edits: 'edit', headlines: 'headline', fonts: 'font', captions: 'captions'}[opt.dataset.group];
     S.style[key] = opt.dataset.id;
     renderSetup();
     return;
@@ -1243,6 +1272,8 @@ $('setupGo').addEventListener('click', async () => {
     editName: styleName('edits', S.style.edit),
     headline: S.style.headline,
     headlineName: styleName('headlines', S.style.headline),
+    font: S.style.font,
+    fontName: styleName('fonts', S.style.font),
     captions: S.style.captions,
     captionsName: styleName('captions', S.style.captions),
     accent: S.style.accent,

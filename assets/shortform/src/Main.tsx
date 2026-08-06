@@ -25,6 +25,11 @@ import {
   useVideoConfig,
 } from 'remotion';
 import {loadFont} from '@remotion/google-fonts/Poppins';
+import {loadFont as loadAnton} from '@remotion/google-fonts/Anton';
+import {loadFont as loadPlayfairDisplay} from '@remotion/google-fonts/PlayfairDisplay';
+import {loadFont as loadLibreBaskerville} from '@remotion/google-fonts/LibreBaskerville';
+import {loadFont as loadMontserrat} from '@remotion/google-fonts/Montserrat';
+import {loadFont as loadCaveat} from '@remotion/google-fonts/Caveat';
 import {measureText} from '@remotion/layout-utils';
 import captions from '../public/captions.json';
 import track from '../public/track.json';
@@ -36,6 +41,20 @@ import {ScatterCaptions} from './ScatterCaptions';
 import {SimpleCaptions, SIMPLE_VARIANTS} from './SimpleCaptions';
 
 const {fontFamily} = loadFont('normal', {weights: ['400', '600', '900']});
+
+// ============ HEADLINE FONT CHOICE (hook.font) =================================
+// A curated set, not an arbitrary Google Fonts picker: each family is a static
+// import (Remotion's font loader is per-package, not dynamic-by-name), chosen to
+// span distinct headline registers. 'poppins' stays the default — every
+// existing edit-data.json with no `font` key renders exactly as before.
+export const HEADLINE_FONTS: Record<string, string> = {
+  poppins: fontFamily,
+  anton: loadAnton('normal', {weights: ['400']}).fontFamily,
+  playfair: loadPlayfairDisplay('normal', {weights: ['700', '900']}).fontFamily,
+  baskerville: loadLibreBaskerville('normal', {weights: ['400', '700']}).fontFamily,
+  montserrat: loadMontserrat('normal', {weights: ['700', '900']}).fontFamily,
+  caveat: loadCaveat('normal', {weights: ['700']}).fontFamily,
+};
 
 // ============ TYPES + DATA ====================================================
 type Caption = {text: string; startMs: number; endMs: number};
@@ -62,6 +81,9 @@ export type EditData = {
     // "realce": each line on its own solid orange marker block.
     // "misto": line 1 light white, line 2 heavy orange.
     style?: 'outline' | 'card' | 'realce' | 'misto';
+    // headline typeface — key into HEADLINE_FONTS. Omit/unknown key -> 'poppins'
+    // (the pre-existing look), so this is purely additive.
+    font?: 'poppins' | 'anton' | 'playfair' | 'baskerville' | 'montserrat' | 'caveat';
     fontSizePx?: number;   // auto-fit CEILING (alias of maxFontPx, kept for compat)
     maxFontPx?: number;    // auto-fit ceiling (per-style default)
     safeWidth?: number;    // auto-fit width budget (per-style default)
@@ -435,15 +457,16 @@ const HL_STYLES: Record<string, HlStyle> = {
   misto: {weights: [400, 900], cap: 98, safeW: 900, lh: 0.98, top: 300},
 };
 
-const hlWidth = (text: string, size: number, weight: number) =>
+const hlWidth = (text: string, size: number, weight: number, family: string) =>
   text
-    ? measureText({text, fontFamily, fontSize: size, fontWeight: weight, letterSpacing: '-1px'}).width
+    ? measureText({text, fontFamily: family, fontSize: size, fontWeight: weight, letterSpacing: '-1px'}).width
     : 0;
 
 // Balance by MEASURED width, not word count: "É assim que vai" and "ficar a sua
 // headline" are 4 words and 3 words but nearly the same width — counting words
-// would break it in the wrong place.
-function twoLines(text: string, weights: [number, number]): [string, string] {
+// would break it in the wrong place. Measured in the CHOSEN font — the break
+// point shifts with the typeface (Caveat runs much narrower than Anton).
+function twoLines(text: string, weights: [number, number], family: string): [string, string] {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length < 2) return [words[0] ?? '', ''];
   let best: [string, string] = [words[0], words.slice(1).join(' ')];
@@ -451,7 +474,7 @@ function twoLines(text: string, weights: [number, number]): [string, string] {
   for (let i = 1; i < words.length; i++) {
     const a = words.slice(0, i).join(' ');
     const b = words.slice(i).join(' ');
-    const d = Math.abs(hlWidth(a, 100, weights[0]) - hlWidth(b, 100, weights[1]));
+    const d = Math.abs(hlWidth(a, 100, weights[0], family) - hlWidth(b, 100, weights[1], family));
     if (d < bestDiff) {
       bestDiff = d;
       best = [a, b];
@@ -463,9 +486,9 @@ function twoLines(text: string, weights: [number, number]): [string, string] {
 // Width scales with size, but letterSpacing (-1px per gap) does NOT — so the
 // first estimate is off by a few px on long lines. One refinement pass at the
 // estimated size fixes that; iterating further buys nothing.
-function fitHeadline(lines: [string, string], s: HlStyle): number {
+function fitHeadline(lines: [string, string], s: HlStyle, family: string): number {
   const widest = (size: number) =>
-    Math.max(hlWidth(lines[0], size, s.weights[0]), hlWidth(lines[1], size, s.weights[1]));
+    Math.max(hlWidth(lines[0], size, s.weights[0], family), hlWidth(lines[1], size, s.weights[1], family));
   let size = Math.floor((s.safeW / Math.max(1, widest(100))) * 100);
   size = clamp(Math.floor((s.safeW / Math.max(1, widest(size))) * size), HL_MIN, s.cap);
   return size;
@@ -481,21 +504,22 @@ const HookInner: React.FC<{totalFrames: number}> = ({totalFrames}) => {
 
   const styleId = H.style ?? 'outline';
   const S = HL_STYLES[styleId] ?? HL_STYLES.outline;
+  const hf = HEADLINE_FONTS[H.font ?? 'poppins'] ?? fontFamily;
   const raw = (H.text ?? (H.lines || []).join(' ')).trim();
-  const lines = twoLines(styleId === 'card' ? raw.toUpperCase() : raw, S.weights);
+  const lines = twoLines(styleId === 'card' ? raw.toUpperCase() : raw, S.weights, hf);
   // fontSizePx is a CEILING, never a fixed size. As a hard override it silently
   // defeats the whole point: at a size the text cannot fit in, the line wraps and
   // the headline becomes three lines again — which is exactly what happened with
   // the uppercase "card" style at the project's inherited fontSizePx of 66.
   const cap = H.fontSizePx ?? H.maxFontPx ?? S.cap;
-  const size = fitHeadline(lines, {...S, cap, safeW: H.safeWidth ?? S.safeW});
+  const size = fitHeadline(lines, {...S, cap, safeW: H.safeWidth ?? S.safeW}, hf);
   const lh = H.lineHeight ?? S.lh;
   const top = H.paddingTop ?? S.top;
   const shell: React.CSSProperties = {
     opacity: op,
     translate: `0px ${y}px`,
     textAlign: 'center',
-    fontFamily,
+    fontFamily: hf,
     lineHeight: lh,
     letterSpacing: -1,
     // the two-line promise is structural: if a fit is ever off, this overflows
@@ -552,7 +576,7 @@ const HookInner: React.FC<{totalFrames: number}> = ({totalFrames}) => {
               {H.sign ? <Img src={staticFile(H.sign)} style={{width: 128, filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.45))'}} /> : null}
             </div>
           ) : null}
-          <div style={{background: '#232326', borderRadius: 24, padding: '28px 46px', textAlign: 'center', fontFamily, fontWeight: 900, fontSize: size, color: '#fff', lineHeight: lh, letterSpacing: -1, textShadow: '0 4px 20px rgba(0,0,0,0.55)', boxShadow: '0 18px 50px rgba(0,0,0,0.45)'}}>
+          <div style={{background: '#232326', borderRadius: 24, padding: '28px 46px', textAlign: 'center', fontFamily: hf, fontWeight: 900, fontSize: size, color: '#fff', lineHeight: lh, letterSpacing: -1, textShadow: '0 4px 20px rgba(0,0,0,0.55)', boxShadow: '0 18px 50px rgba(0,0,0,0.45)'}}>
             {lines.filter(Boolean).map((l, i) => (<div key={i}>{l}</div>))}
           </div>
         </div>

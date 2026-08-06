@@ -47,6 +47,7 @@ the Estilo tab at the end of Fase 1; every key maps to something here:
 | `edit: "limpa"` | **the default** — NO split inserts, full frame throughout. See the "Limpa" section |
 | `edit: "split" \| "split2"` | the split-screen variant below — every image insert uses it |
 | `headline: "outline" \| "card" \| "realce" \| "misto"` | `hook.style` in edit-data.json |
+| `font: "poppins" \| "anton" \| "playfair" \| "baskerville" \| "montserrat" \| "caveat"` | `hook.font` in edit-data.json — headline typeface only, captions unaffected. Omit/unknown → `poppins` (pre-existing look) |
 | `captions: "karaoke" \| "stacked" \| "scatter" \| "simples" \| "serifada" \| "classica"` | `captions.style` in edit-data.json (+ the director step for stacked) |
 | `accent` (hex) | `hook.accent` + `captions.accent`. Only `realce`/`misto`/`stacked` paint it; `accentUsed:false` means the picked styles have none |
 | `elements.tracking` | `face_track.py` + `track.json`; OFF → skip it, fixed frame |
@@ -161,6 +162,19 @@ Four looks via `hook.style`, picked by the user on the Estilo tab: **`outline`**
 (default, white + thick black stroke), **`card`** (dark rounded card, UPPERCASE,
 optional logo row), **`realce`** (each line on a solid accent marker block),
 **`misto`** (line 1 light white, line 2 heavy accent).
+
+**Typeface is a separate pick, `hook.font`.** Six options (`HEADLINE_FONTS` in
+Main.tsx): `poppins` (default), `anton` (heavy display/impact), `playfair`
+(elegant serif), `baskerville` (classic serif), `montserrat` (clean geometric
+sans), `caveat` (handwritten/casual). It only re-skins the headline — captions
+keep their own per-style fonts (karaoke/scatter/stacked/simples/serifada/
+classica are unaffected). Omit it and every existing edit-data.json renders
+exactly as before (defaults to `poppins`). Each font is a static
+`@remotion/google-fonts/<Family>` import — there is no dynamic "any Google
+font by name" loader — so adding a 7th option means importing its package in
+Main.tsx, adding it to `HEADLINE_FONTS`, and mirroring both the id and its CSS
+stack in the preview's `STYLE_CATALOG.fonts` / `FONT_STACKS` (app.js), same as
+any other style dimension.
 
 ### The accent colour (`accent` in preview_style.json)
 
