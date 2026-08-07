@@ -30,6 +30,7 @@ import {loadFont as loadPlayfairDisplay} from '@remotion/google-fonts/PlayfairDi
 import {loadFont as loadLibreBaskerville} from '@remotion/google-fonts/LibreBaskerville';
 import {loadFont as loadMontserrat} from '@remotion/google-fonts/Montserrat';
 import {loadFont as loadCaveat} from '@remotion/google-fonts/Caveat';
+import {loadFont as loadCustomFont} from '@remotion/fonts';
 import {measureText} from '@remotion/layout-utils';
 import captions from '../public/captions.json';
 import track from '../public/track.json';
@@ -55,6 +56,26 @@ export const HEADLINE_FONTS: Record<string, string> = {
   montserrat: loadMontserrat('normal', {weights: ['700', '900']}).fontFamily,
   caveat: loadCaveat('normal', {weights: ['700']}).fontFamily,
 };
+
+// ============ CUSTOM (uploaded) HEADLINE FONTS =================================
+// Her own font file, not the curated 6 — declare it in edit-data.json's
+// top-level `customFonts` and drop the file at public/<file>. `id` becomes the
+// key for `hook.font`, exactly like the built-in fonts above. loadFont from
+// @remotion/fonts (unlike @remotion/google-fonts) takes an arbitrary URL and
+// self-delays the render via delayRender/continueRender until the file is
+// actually loaded — call it and move on, no await needed here.
+type CustomFontDef = {id: string; file: string; weight?: string; style?: 'normal' | 'italic'};
+const customFontDefs = (editData as {customFonts?: CustomFontDef[]}).customFonts ?? [];
+for (const cf of customFontDefs) {
+  const family = `custom-${cf.id}`;
+  HEADLINE_FONTS[cf.id] = family;
+  loadCustomFont({
+    family,
+    url: staticFile(cf.file),
+    weight: cf.weight ?? '400',
+    style: cf.style ?? 'normal',
+  });
+}
 
 // ============ TYPES + DATA ====================================================
 type Caption = {text: string; startMs: number; endMs: number};

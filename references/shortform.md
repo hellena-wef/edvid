@@ -48,6 +48,7 @@ the Estilo tab at the end of Fase 1; every key maps to something here:
 | `edit: "split" \| "split2"` | the split-screen variant below — every image insert uses it |
 | `headline: "outline" \| "card" \| "realce" \| "misto"` | `hook.style` in edit-data.json |
 | `font: "poppins" \| "anton" \| "playfair" \| "baskerville" \| "montserrat" \| "caveat"` | `hook.font` in edit-data.json — headline typeface only, captions unaffected. Omit/unknown → `poppins` (pre-existing look) |
+| a font she owns (her own `.ttf`/`.otf`, e.g. a brand font) | drop the file at `remotion/public/fonts/<file>`, add one entry to top-level `customFonts` in edit-data.json (`{"id": "...", "file": "fonts/<file>", "weight": "400", "style": "normal"}`), then set `hook.font` to that `id`. **Never commit the font file to the repo** — `assets/shortform/public/fonts/*` is gitignored (except `.gitkeep`) because these are almost always commercially licensed and the fork is public; the file stays local to whoever's machine is rendering |
 | `captions: "karaoke" \| "stacked" \| "scatter" \| "simples" \| "serifada" \| "classica"` | `captions.style` in edit-data.json (+ the director step for stacked) |
 | `accent` (hex) | `hook.accent` + `captions.accent`. Only `realce`/`misto`/`stacked` paint it; `accentUsed:false` means the picked styles have none |
 | `elements.tracking` | `face_track.py` + `track.json`; OFF → skip it, fixed frame |

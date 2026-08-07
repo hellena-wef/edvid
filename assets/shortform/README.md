@@ -41,10 +41,15 @@ Then copy `cut.mp4` into `public/` and generate the data files below.
     "zooms": [1.14, 1.2, 1.12, 1.22, 1.16, 1.1, 1.18],  // per cut segment, cycles
     "pushIn": 0.04, "targetX": 0.5, "targetY": 0.4
   },
+  "customFonts": [                   // OPTIONAL — her own font files, not the curated 6
+    {"id": "minhafonte", "file": "fonts/MinhaFonte.ttf", "weight": "700", "style": "normal"}
+    // drop the file at public/fonts/<file> (gitignored — never commit it, most
+    // are commercially licensed). `id` becomes a valid `hook.font` value.
+  ],
   "hook": {                          // static headline, first ~4s (always on)
     "enabled": true, "endSec": 4.0,
     "style": "card",                 // "card" (default) | "outline" | "realce" | "misto"
-    "font": "poppins",               // "poppins" (default) | "anton" | "playfair" | "baskerville" | "montserrat" | "caveat" — headline typeface only
+    "font": "poppins",               // "poppins" (default) | "anton" | "playfair" | "baskerville" | "montserrat" | "caveat" | a `customFonts[].id` — headline typeface only
     "lines": ["A IA MAIS", "PERIGOSA DO MUNDO", "ACABOU DE SER LIBERADA"],
     "logo": "brand/logo.webp",       // card only: public/ path or null
     "sign": "brand/warning.webp"     // card only: transparent symbol or null
