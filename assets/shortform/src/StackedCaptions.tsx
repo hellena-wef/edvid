@@ -42,10 +42,15 @@ const ORANGE = '#ff5200';
 
 // -------- config (optional overrides in edit-data.json → captions) --------
 type SfxCfg = {enabled?: boolean; clickVolume?: number; scratchVolume?: number};
-type CapCfg = {stackedOffsetY?: number; fontScale?: number; accent?: string; sfx?: SfxCfg};
+type CapCfg = {stackedOffsetY?: number; fontScale?: number; letterSpacing?: number; accent?: string; sfx?: SfxCfg};
 const CAP = ((editData as {captions?: CapCfg}).captions ?? {}) as CapCfg;
 const OFFSET_Y = CAP.stackedOffsetY ?? 0.156; // fraction of height, below center
 const FONT_SCALE = CAP.fontScale ?? 1;
+// Added to every hardcoded per-role letterSpacing below (STACK_MIXED lines,
+// SOLO_BIG, the circled outline word) rather than replacing it — those values
+// are each tuned to a different font size, so a DELTA preserves their
+// relative feel instead of flattening one absolute number onto all three.
+const TRACK = CAP.letterSpacing ?? 0;
 // captions.accent from the Estilo tab — this is the ONE accent slot stacked
 // paints (the serif emphasis word). Falls back to the original orange so an
 // edit-data.json with no accent set renders exactly as before.
@@ -169,7 +174,7 @@ const Cue: React.FC<{cue: CueData; cueDurationFrames: number}> = ({cue, cueDurat
               key={li}
               style={{
                 fontSize: size * scale,
-                letterSpacing: -1.5,
+                letterSpacing: -1.5 + TRACK,
                 lineHeight: 1.12,
                 marginTop: li === 0 ? 0 : '-0.34em',
                 whiteSpace: 'pre',
@@ -209,7 +214,7 @@ const Cue: React.FC<{cue: CueData; cueDurationFrames: number}> = ({cue, cueDurat
           fontWeight: 900,
           fontStyle: 'italic',
           fontSize: fitFont(w.text, 150, avail / scale, 0.6) * scale,
-          letterSpacing: -3,
+          letterSpacing: -3 + TRACK,
           lineHeight: 1.12,
           padding: '0 0.14em',
           opacity: a.opacity,
@@ -239,7 +244,7 @@ const Cue: React.FC<{cue: CueData; cueDurationFrames: number}> = ({cue, cueDurat
             fontFamily: POPPINS,
             fontWeight: 900,
             fontSize: fitFont(w.text, 118, (avail - 80) / scale, 0.6) * scale,
-            letterSpacing: -2,
+            letterSpacing: -2 + TRACK,
             lineHeight: 1.12,
             padding: '0 0.1em',
             opacity: a.opacity,

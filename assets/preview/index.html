@@ -74,18 +74,47 @@
       </div>
 
       <div class="setup-group">
-        <div class="group-head"><span class="group-title">Estilo de headline</span></div>
+        <div class="group-head">
+          <span class="group-title">Estilo de headline</span>
+          <label class="group-switch"><input type="checkbox" id="headlineEnabled" checked><span>Mostrar headline</span></label>
+        </div>
         <div id="optHeadline" class="opt-grid"></div>
       </div>
 
-      <div class="setup-group">
-        <div class="group-head"><span class="group-title">Fonte da headline</span></div>
-        <div id="optFont" class="opt-grid"></div>
+      <div id="headlineFontBlock">
+        <div class="setup-group">
+          <div class="group-head"><span class="group-title">Fonte da headline — linha 1</span></div>
+          <div id="optFont" class="opt-grid"></div>
+        </div>
+
+        <div class="setup-group">
+          <div class="group-head">
+            <span class="group-title">Fonte da headline — linha 2</span>
+            <label class="group-switch"><input type="checkbox" id="font2Enabled"><span>Fonte diferente na linha 2</span></label>
+          </div>
+          <div id="optFont2" class="opt-grid hidden"></div>
+        </div>
       </div>
 
       <div class="setup-group">
         <div class="group-head"><span class="group-title">Estilo de legenda</span></div>
         <div id="optCaptions" class="opt-grid"></div>
+      </div>
+
+      <div class="setup-group" id="captionTuneGroup">
+        <div class="group-head"><span class="group-title">Ajustes da legenda</span></div>
+        <div class="tune-row">
+          <label>Tamanho <span id="capSizeVal"></span></label>
+          <input type="range" id="capSize" min="0.6" max="1.6" step="0.05">
+        </div>
+        <div class="tune-row">
+          <label>Espaçamento entre letras <span id="capTrackingVal"></span></label>
+          <input type="range" id="capTracking" min="-4" max="8" step="0.5">
+        </div>
+        <div class="tune-row">
+          <label>Posição vertical <span id="capPosVal"></span></label>
+          <input type="range" id="capPosition" min="0" max="1" step="0.02">
+        </div>
       </div>
 
       <div class="setup-group">

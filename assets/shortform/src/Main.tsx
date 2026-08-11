@@ -104,7 +104,10 @@ export type EditData = {
     style?: 'outline' | 'card' | 'realce' | 'misto';
     // headline typeface — key into HEADLINE_FONTS. Omit/unknown key -> 'poppins'
     // (the pre-existing look), so this is purely additive.
-    font?: 'poppins' | 'anton' | 'playfair' | 'baskerville' | 'montserrat' | 'caveat';
+    font?: string;
+    // OPTIONAL per-line override for line 2 — omit and it matches `font`
+    // (every pre-existing edit-data.json). Any HEADLINE_FONTS key.
+    font2?: string;
     fontSizePx?: number;   // auto-fit CEILING (alias of maxFontPx, kept for compat)
     maxFontPx?: number;    // auto-fit ceiling (per-style default)
     safeWidth?: number;    // auto-fit width budget (per-style default)
@@ -485,9 +488,11 @@ const hlWidth = (text: string, size: number, weight: number, family: string) =>
 
 // Balance by MEASURED width, not word count: "É assim que vai" and "ficar a sua
 // headline" are 4 words and 3 words but nearly the same width — counting words
-// would break it in the wrong place. Measured in the CHOSEN font — the break
-// point shifts with the typeface (Caveat runs much narrower than Anton).
-function twoLines(text: string, weights: [number, number], family: string): [string, string] {
+// would break it in the wrong place. `families` is [line1Font, line2Font] —
+// almost always the same font twice, but hook.font2 lets them differ, and each
+// line has to be measured in ITS OWN font (Caveat runs much narrower than
+// Anton at the same size, so measuring line 2 in line 1's font mis-balances it).
+function twoLines(text: string, weights: [number, number], families: [string, string]): [string, string] {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length < 2) return [words[0] ?? '', ''];
   let best: [string, string] = [words[0], words.slice(1).join(' ')];
@@ -495,7 +500,7 @@ function twoLines(text: string, weights: [number, number], family: string): [str
   for (let i = 1; i < words.length; i++) {
     const a = words.slice(0, i).join(' ');
     const b = words.slice(i).join(' ');
-    const d = Math.abs(hlWidth(a, 100, weights[0], family) - hlWidth(b, 100, weights[1], family));
+    const d = Math.abs(hlWidth(a, 100, weights[0], families[0]) - hlWidth(b, 100, weights[1], families[1]));
     if (d < bestDiff) {
       bestDiff = d;
       best = [a, b];
@@ -507,9 +512,9 @@ function twoLines(text: string, weights: [number, number], family: string): [str
 // Width scales with size, but letterSpacing (-1px per gap) does NOT — so the
 // first estimate is off by a few px on long lines. One refinement pass at the
 // estimated size fixes that; iterating further buys nothing.
-function fitHeadline(lines: [string, string], s: HlStyle, family: string): number {
+function fitHeadline(lines: [string, string], s: HlStyle, families: [string, string]): number {
   const widest = (size: number) =>
-    Math.max(hlWidth(lines[0], size, s.weights[0], family), hlWidth(lines[1], size, s.weights[1], family));
+    Math.max(hlWidth(lines[0], size, s.weights[0], families[0]), hlWidth(lines[1], size, s.weights[1], families[1]));
   let size = Math.floor((s.safeW / Math.max(1, widest(100))) * 100);
   size = clamp(Math.floor((s.safeW / Math.max(1, widest(size))) * size), HL_MIN, s.cap);
   return size;
@@ -525,22 +530,26 @@ const HookInner: React.FC<{totalFrames: number}> = ({totalFrames}) => {
 
   const styleId = H.style ?? 'outline';
   const S = HL_STYLES[styleId] ?? HL_STYLES.outline;
-  const hf = HEADLINE_FONTS[H.font ?? 'poppins'] ?? fontFamily;
+  const hf1 = HEADLINE_FONTS[H.font ?? 'poppins'] ?? fontFamily;
+  // font2 is an explicit opt-in (the Estilo tab only sends it when the user
+  // turned on "fonte diferente na linha 2") — unset means "same as line 1",
+  // which is every edit-data.json from before this existed.
+  const hf2 = H.font2 ? (HEADLINE_FONTS[H.font2] ?? hf1) : hf1;
   const raw = (H.text ?? (H.lines || []).join(' ')).trim();
-  const lines = twoLines(styleId === 'card' ? raw.toUpperCase() : raw, S.weights, hf);
+  const lines = twoLines(styleId === 'card' ? raw.toUpperCase() : raw, S.weights, [hf1, hf2]);
   // fontSizePx is a CEILING, never a fixed size. As a hard override it silently
   // defeats the whole point: at a size the text cannot fit in, the line wraps and
   // the headline becomes three lines again — which is exactly what happened with
   // the uppercase "card" style at the project's inherited fontSizePx of 66.
   const cap = H.fontSizePx ?? H.maxFontPx ?? S.cap;
-  const size = fitHeadline(lines, {...S, cap, safeW: H.safeWidth ?? S.safeW}, hf);
+  const size = fitHeadline(lines, {...S, cap, safeW: H.safeWidth ?? S.safeW}, [hf1, hf2]);
   const lh = H.lineHeight ?? S.lh;
   const top = H.paddingTop ?? S.top;
   const shell: React.CSSProperties = {
     opacity: op,
     translate: `0px ${y}px`,
     textAlign: 'center',
-    fontFamily: hf,
+    fontFamily: hf1,
     lineHeight: lh,
     letterSpacing: -1,
     // the two-line promise is structural: if a fit is ever off, this overflows
@@ -561,6 +570,7 @@ const HookInner: React.FC<{totalFrames: number}> = ({totalFrames}) => {
                 color: '#fff',
                 fontWeight: 900,
                 fontSize: size,
+                fontFamily: i === 0 ? hf1 : hf2,
                 padding: '0.08em 0.3em 0.16em',
                 borderRadius: 12,
                 boxShadow: '0 10px 28px rgba(0,0,0,0.45)',
@@ -579,8 +589,8 @@ const HookInner: React.FC<{totalFrames: number}> = ({totalFrames}) => {
       <AbsoluteFill style={{justifyContent: 'flex-start', alignItems: 'center', paddingTop: top}}>
         <Sfx src="whoosh.mp3" volume={0.1} />
         <div style={{...shell, filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.55))'}}>
-          <div style={{fontWeight: 400, fontSize: size, color: '#fff'}}>{lines[0]}</div>
-          <div style={{fontWeight: 900, fontSize: size, color: '#ff5200'}}>{lines[1]}</div>
+          <div style={{fontWeight: 400, fontSize: size, color: '#fff', fontFamily: hf1}}>{lines[0]}</div>
+          <div style={{fontWeight: 900, fontSize: size, color: '#ff5200', fontFamily: hf2}}>{lines[1]}</div>
         </div>
       </AbsoluteFill>
     );
@@ -597,8 +607,8 @@ const HookInner: React.FC<{totalFrames: number}> = ({totalFrames}) => {
               {H.sign ? <Img src={staticFile(H.sign)} style={{width: 128, filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.45))'}} /> : null}
             </div>
           ) : null}
-          <div style={{background: '#232326', borderRadius: 24, padding: '28px 46px', textAlign: 'center', fontFamily: hf, fontWeight: 900, fontSize: size, color: '#fff', lineHeight: lh, letterSpacing: -1, textShadow: '0 4px 20px rgba(0,0,0,0.55)', boxShadow: '0 18px 50px rgba(0,0,0,0.45)'}}>
-            {lines.filter(Boolean).map((l, i) => (<div key={i}>{l}</div>))}
+          <div style={{background: '#232326', borderRadius: 24, padding: '28px 46px', textAlign: 'center', fontWeight: 900, fontSize: size, color: '#fff', lineHeight: lh, letterSpacing: -1, textShadow: '0 4px 20px rgba(0,0,0,0.55)', boxShadow: '0 18px 50px rgba(0,0,0,0.45)'}}>
+            {lines.filter(Boolean).map((l, i) => (<div key={i} style={{fontFamily: i === 0 ? hf1 : hf2}}>{l}</div>))}
           </div>
         </div>
       </AbsoluteFill>
@@ -621,7 +631,7 @@ const HookInner: React.FC<{totalFrames: number}> = ({totalFrames}) => {
           padding: '0 60px',
         }}
       >
-        {lines.filter(Boolean).map((l, i) => (<div key={i}>{l}</div>))}
+        {lines.filter(Boolean).map((l, i) => (<div key={i} style={{fontFamily: i === 0 ? hf1 : hf2}}>{l}</div>))}
       </div>
     </AbsoluteFill>
   );

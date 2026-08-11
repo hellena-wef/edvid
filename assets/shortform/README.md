@@ -50,6 +50,7 @@ Then copy `cut.mp4` into `public/` and generate the data files below.
     "enabled": true, "endSec": 4.0,
     "style": "card",                 // "card" (default) | "outline" | "realce" | "misto"
     "font": "poppins",               // "poppins" (default) | "anton" | "playfair" | "baskerville" | "montserrat" | "caveat" | a `customFonts[].id` — headline typeface only
+    "font2": "playfair",             // OPTIONAL — line 2 only, e.g. mono top line + serif bottom line. Omit → same as `font`
     "lines": ["A IA MAIS", "PERIGOSA DO MUNDO", "ACABOU DE SER LIBERADA"],
     "logo": "brand/logo.webp",       // card only: public/ path or null
     "sign": "brand/warning.webp"     // card only: transparent symbol or null

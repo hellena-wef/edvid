@@ -616,9 +616,23 @@ function defaultStyle() {
   for (const e of STYLE_CATALOG.elements) elements[e.id] = !!e.def;
   return {
     edit: STYLE_CATALOG.edits[0].id,
+    headlineEnabled: true,
     headline: STYLE_CATALOG.headlines[0].id,
     font: STYLE_CATALOG.fonts[0].id,
+    // line 2 rides on its own font only when explicitly turned on — off means
+    // "same as line 1", which is the pre-existing look (misto/realce/etc all
+    // used one font for both lines before this existed)
+    font2Enabled: false,
+    font2: STYLE_CATALOG.fonts[0].id,
     captions: STYLE_CATALOG.captions[0].id,
+    // caption tuning: a scale MULTIPLIER (1 = the style's own default) rather
+    // than an absolute size, because each caption style's base size is a
+    // different number (karaoke 76px, stacked's own internal scale, scatter
+    // 74px) — one multiplier means one slider works for all of them. Tracking
+    // and position are absolute since those units are stable across styles.
+    capSize: 1,
+    capTracking: -1,
+    capPosition: 0.22,
     accent: ACCENT_DEFAULT,
     elements,
     note: '',
@@ -1156,8 +1170,14 @@ function updateAccentNote() {
 function updateSummary() {
   const on = STYLE_CATALOG.elements.filter((e) => S.style.elements[e.id]);
   const accentBit = accentUsed() ? ` · destaque ${accentName(S.style.accent)}` : '';
+  const fontBit = S.style.font2Enabled
+    ? `(${styleName('fonts', S.style.font)} / ${styleName('fonts', S.style.font2)})`
+    : `(${styleName('fonts', S.style.font)})`;
+  const headlineBit = S.style.headlineEnabled
+    ? `headline ${styleName('headlines', S.style.headline)} ${fontBit}`
+    : 'sem headline';
   $('setupSummary').textContent =
-    `${styleName('edits', S.style.edit)} · headline ${styleName('headlines', S.style.headline)} (${styleName('fonts', S.style.font)})` +
+    `${styleName('edits', S.style.edit)} · ${headlineBit}` +
     ` · legenda ${styleName('captions', S.style.captions)}${accentBit} · ` +
     (on.length ? on.map((e) => e.name).join(', ') : 'sem elementos extras');
 }
@@ -1191,12 +1211,17 @@ function renderSetup() {
     : 'Salvar e refazer a Fase 2';
 
   capAnims = [];
-  const radios = (host, group, chosen) => {
+  // groupKey lets a second instance of the SAME catalog group (font picker
+  // for line 2) route clicks to a different S.style key than the first —
+  // the options still come from STYLE_CATALOG[group], only dataset.group
+  // (read by the click handler's key map below) differs.
+  const radios = (host, group, chosen, groupKey) => {
     const opts = STYLE_CATALOG[group];
+    const dsGroup = groupKey || group;
     host.innerHTML = '';
     for (const o of opts) {
       const card = el('div', `opt${o.id === chosen ? ' on' : ''}`, host);
-      card.dataset.group = group;
+      card.dataset.group = dsGroup;
       card.dataset.id = o.id;
       // headline previews are two short lines — they do not need the caption
       // box's height, and with four groups on one screen that height is scarce
@@ -1225,8 +1250,33 @@ function renderSetup() {
   radios($('optEdit'), 'edits', S.style.edit);
   radios($('optHeadline'), 'headlines', S.style.headline);
   radios($('optFont'), 'fonts', S.style.font);
+  if (S.style.font2Enabled) radios($('optFont2'), 'fonts', S.style.font2, 'fonts2');
   radios($('optCaptions'), 'captions', S.style.captions);
   renderAccents();
+
+  // "sem headline" — hides the two font groups too (nothing to pick a
+  // typeface for) and greys the headline-style cards so the disabled state
+  // reads as disabled rather than as if the pick silently reset
+  $('headlineEnabled').checked = S.style.headlineEnabled;
+  $('headlineFontBlock').classList.toggle('hidden', !S.style.headlineEnabled);
+  $('optHeadline').classList.toggle('disabled', !S.style.headlineEnabled);
+
+  $('font2Enabled').checked = S.style.font2Enabled;
+  $('optFont2').classList.toggle('hidden', !S.style.font2Enabled);
+
+  // caption tuning only makes sense for styles with something to tune — the
+  // three static styles (simples/serifada/classica) "take no tunables... they
+  // ARE the tuning" (shortform.md), so the sliders would silently do nothing
+  const STATIC_CAPTIONS = ['simples', 'serifada', 'classica'];
+  $('captionTuneGroup').classList.toggle('hidden', STATIC_CAPTIONS.includes(S.style.captions));
+  $('capSize').value = S.style.capSize;
+  $('capSizeVal').textContent = `${S.style.capSize.toFixed(2)}x`;
+  $('capTracking').value = S.style.capTracking;
+  $('capTrackingVal').textContent = `${S.style.capTracking}px`;
+  $('capPosition').value = S.style.capPosition;
+  // capPosition is a fraction FROM THE BOTTOM edge (matches paddingBottom's own
+  // convention) — small = hugging the bottom, large = up near the middle/top
+  $('capPosVal').textContent = S.style.capPosition < 0.35 ? 'em baixo' : S.style.capPosition > 0.65 ? 'em cima' : 'no meio';
 
   const host = $('optElements');
   host.innerHTML = '';
@@ -1248,7 +1298,7 @@ $('styleSetup').addEventListener('click', (e) => {
   if (e.target.closest('#optAccent')) return;
   const opt = e.target.closest('.opt:not(.ghost)');
   if (opt) {
-    const key = {edits: 'edit', headlines: 'headline', fonts: 'font', captions: 'captions'}[opt.dataset.group];
+    const key = {edits: 'edit', headlines: 'headline', fonts: 'font', fonts2: 'font2', captions: 'captions'}[opt.dataset.group];
     S.style[key] = opt.dataset.id;
     renderSetup();
     return;
@@ -1258,6 +1308,31 @@ $('styleSetup').addEventListener('click', (e) => {
     S.style.elements[chk.dataset.id] = !S.style.elements[chk.dataset.id];
     renderSetup();
   }
+});
+
+$('headlineEnabled').addEventListener('change', (e) => {
+  S.style.headlineEnabled = e.target.checked;
+  renderSetup();
+});
+$('font2Enabled').addEventListener('change', (e) => {
+  S.style.font2Enabled = e.target.checked;
+  renderSetup();
+});
+
+// Sliders update live (label text + summary) without a full renderSetup — a
+// full rebuild on every drag tick would re-run every headline/caption demo
+// builder per frame of the drag, and none of them need to react to this.
+$('capSize').addEventListener('input', (e) => {
+  S.style.capSize = parseFloat(e.target.value);
+  $('capSizeVal').textContent = `${S.style.capSize.toFixed(2)}x`;
+});
+$('capTracking').addEventListener('input', (e) => {
+  S.style.capTracking = parseFloat(e.target.value);
+  $('capTrackingVal').textContent = `${S.style.capTracking}px`;
+});
+$('capPosition').addEventListener('input', (e) => {
+  S.style.capPosition = parseFloat(e.target.value);
+  $('capPosVal').textContent = S.style.capPosition < 0.35 ? 'em baixo' : S.style.capPosition > 0.65 ? 'em cima' : 'no meio';
 });
 
 $('setupGo').addEventListener('click', async () => {
@@ -1270,12 +1345,29 @@ $('setupGo').addEventListener('click', async () => {
     rerender,
     edit: S.style.edit,
     editName: styleName('edits', S.style.edit),
+    headlineEnabled: S.style.headlineEnabled,
     headline: S.style.headline,
     headlineName: styleName('headlines', S.style.headline),
     font: S.style.font,
     fontName: styleName('fonts', S.style.font),
+    // present only for a font the user dropped in herself — the skill has no
+    // other way to know which file backs this id (built-ins need none)
+    customFontFile: (STYLE_CATALOG.fonts.find((o) => o.id === S.style.font) || {}).file || null,
+    // line 2 override — null means "same as line 1", not "unset"; the skill
+    // should not go looking for a font2 that was never turned on
+    font2: S.style.font2Enabled ? S.style.font2 : null,
+    font2Name: S.style.font2Enabled ? styleName('fonts', S.style.font2) : null,
+    customFont2File: S.style.font2Enabled
+      ? (STYLE_CATALOG.fonts.find((o) => o.id === S.style.font2) || {}).file || null
+      : null,
     captions: S.style.captions,
     captionsName: styleName('captions', S.style.captions),
+    // caption tuning — capSize is a multiplier (1 = the style's own default);
+    // capPosition is a fraction from the BOTTOM edge. Ignored by the skill for
+    // the three static caption styles (no tunables to apply them to).
+    capSize: S.style.capSize,
+    capTracking: S.style.capTracking,
+    capPosition: S.style.capPosition,
     accent: S.style.accent,
     accentName: accentName(S.style.accent),
     // whether the picked styles actually paint it — so the skill does not go
@@ -1907,8 +1999,46 @@ $('jcutToggle').addEventListener('click', () => {
   positionNeedle();
 });
 
+// Custom fonts the user dropped into the skill once (see references/shortform.md
+// "a font she owns") — shared across every project, not per-session. Appended to
+// STYLE_CATALOG.fonts so the existing radios()/key-map/save-payload machinery
+// handles them exactly like the 6 built-in fonts; the only extra bit is
+// @font-face, since the browser has never seen these files before.
+async function fetchCustomFonts() {
+  try {
+    const res = await fetch('/api/fonts');
+    const {fonts} = await res.json();
+    if (!fonts || !fonts.length) return;
+    const css = fonts.map((f) =>
+      `@font-face { font-family: 'custom-${f.id}'; src: url('/fonts/${encodeURIComponent(f.file)}'); font-weight: 400; font-style: ${f.style}; }`
+    ).join('\n');
+    let styleTag = document.getElementById('customFontFaces');
+    if (!styleTag) {
+      styleTag = el('style', '', document.head);
+      styleTag.id = 'customFontFaces';
+    }
+    styleTag.textContent = css;
+    for (const f of fonts) {
+      FONT_STACKS[f.id] = `'custom-${f.id}', sans-serif`;
+      if (!STYLE_CATALOG.fonts.some((o) => o.id === f.id)) {
+        // `file` rides along so setupGo's payload can tell the skill exactly
+        // which file backs this pick — it has no other way to know
+        STYLE_CATALOG.fonts.push({id: f.id, name: f.name, font: f.id, custom: true, file: f.file});
+      }
+    }
+    // load() before first paint — @font-face alone shows the fallback font
+    // until the browser actually fetches the file, and a headline size FIT
+    // measured against the fallback is wrong the instant the real font lands
+    await Promise.all(fonts.map((f) =>
+      document.fonts.load(`16px 'custom-${f.id}'`).catch(() => {})
+    ));
+    if (S.style) renderSetup();
+  } catch (e) { /* no fonts endpoint / none dropped in — the 6 built-ins still work */ }
+}
+
 poll();
 rafLoop();
+fetchCustomFonts();
 // the headline fit is MEASURED, so it is wrong until Poppins is actually
 // loaded — rebuild once the fonts land
 if (document.fonts && document.fonts.ready) {

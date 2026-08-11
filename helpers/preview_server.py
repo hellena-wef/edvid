@@ -15,9 +15,13 @@ Routes:
   /                     the app (from <skill>/assets/preview/)
   /assets/<file>        app files (css/js/logo)
   /media/<path>         files under --root (the edit dir) — Range supported
+  /fonts/<file>         shared custom fonts (<skill>/assets/shortform/public/fonts/)
+                        — same files the Estilo tab's font picker offers, dropped
+                        in once and reused across every project on this machine
   /gen/waveform.json    min/max audio peaks of cut.mp4 (auto-(re)generated)
   /gen/thumbs/<n>.jpg   timeline filmstrip thumbs (auto-generated, 1 per 2s)
   /api/state    GET     state.json + mtimes (UI polls this to hot-reload)
+  /api/fonts    GET     [{id,name,file,style}] custom fonts found in FONTS_DIR
   /api/save     POST    body → <edit>/preview_edits.json (atomic), or
                         <edit>/preview_style.json when body.type=="style-setup"
 
@@ -38,6 +42,32 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent.parent / "assets" / "preview"
+# Shared across every project (not per-session): fonts the user has dropped in
+# once via the skill (see references/shortform.md "a font she owns"). Gitignored
+# in the skill repo — commercial font files never get committed.
+FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "shortform" / "public" / "fonts"
+FONT_EXTS = {".ttf", ".otf", ".woff", ".woff2"}
+
+
+def _font_id(stem: str) -> str:
+    """Filename stem -> stable id, same slug the Estilo tab and Main.tsx agree on."""
+    slug = re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-")
+    return slug or "font"
+
+
+def list_custom_fonts() -> list[dict]:
+    if not FONTS_DIR.is_dir():
+        return []
+    out = []
+    for p in sorted(FONTS_DIR.iterdir()):
+        if p.suffix.lower() in FONT_EXTS:
+            out.append({
+                "id": _font_id(p.stem),
+                "name": p.stem,
+                "file": p.name,
+                "style": "italic" if "italic" in p.stem.lower() else "normal",
+            })
+    return out
 PEAKS_PER_SEC = 40
 THUMB_EVERY_S = 2.0
 THUMB_HEIGHT = 90
@@ -205,12 +235,17 @@ class Handler(BaseHTTPRequestHandler):
         elif path.startswith("/media/"):
             p = self._safe(self.root, path[len("/media/"):])
             self._send_file(p) if p else self._json({"error": "bad path"}, 400)
+        elif path.startswith("/fonts/"):
+            p = self._safe(FONTS_DIR, path[len("/fonts/"):])
+            self._send_file(p) if p else self._json({"error": "bad path"}, 400)
         elif path == "/gen/waveform.json":
             self._waveform()
         elif path.startswith("/gen/thumbs/"):
             self._thumbs(path[len("/gen/thumbs/"):])
         elif path == "/api/state":
             self._state()
+        elif path == "/api/fonts":
+            self._json({"fonts": list_custom_fonts()})
         else:
             self._json({"error": "unknown route"}, 404)
 
